@@ -1,0 +1,173 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdn.canvasjs.com/canvasjs.min.js"></script>
+<title>Live Accelerometer Data</title>
+<style>
+    body { font-family: Arial, sans-serif; }
+    .chart-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .chart {
+        height: 370px;
+        width: 48%;
+        min-width: 450px;
+        margin: 10px;
+    }
+</style>
+</head>
+<body>
+
+<h1>Live Accelerometer Data</h1>
+<div class="chart-container">
+    <div id="accelChartContainer" class="chart"></div>
+    <div id="orientationChartContainer" class="chart"></div>
+</div>
+
+<script>
+window.onload = function () {
+
+    const dataPointsAccelX = [];
+    const dataPointsAccelY = [];
+    const dataPointsAccelZ = [];
+    const dataPointsRoll = [];
+    const dataPointsPitch = [];
+    const maxDataPoints = 50; // Number of data points to show on the chart
+
+    const accelChart = new CanvasJS.Chart("accelChartContainer", {
+        animationEnabled: true,
+        zoomEnabled: true,
+        title: {
+            text: "Live Acceleration"
+        },
+        axisX: {
+            title: "Time"
+        },
+        axisY: {
+            title: "m/s^2",
+            includeZero: false
+        },
+        legend: {
+            cursor: "pointer",
+            fontSize: 16,
+            itemclick: toggleDataSeries
+        },
+        toolTip: {
+            shared: true
+        },
+        data: [{
+            name: "X-axis",
+            type: "spline",
+            showInLegend: true,
+            dataPoints: dataPointsAccelX
+        },
+        {
+            name: "Y-axis",
+            type: "spline",
+            showInLegend: true,
+            dataPoints: dataPointsAccelY
+        },
+        {
+            name: "Z-axis",
+            type: "spline",
+            showInLegend: true,
+            dataPoints: dataPointsAccelZ
+        }]
+    });
+
+    const orientationChart = new CanvasJS.Chart("orientationChartContainer", {
+        animationEnabled: true,
+        zoomEnabled: true,
+        title: {
+            text: "Live Orientation"
+        },
+        axisX: {
+            title: "Time"
+        },
+        axisY: {
+            title: "Degrees (°)",
+            includeZero: false
+        },
+        legend: {
+            cursor: "pointer",
+            fontSize: 16,
+            itemclick: toggleDataSeries
+        },
+        toolTip: {
+            shared: true
+        },
+        data: [{
+            name: "Roll",
+            type: "spline",
+            showInLegend: true,
+            dataPoints: dataPointsRoll
+        },
+        {
+            name: "Pitch",
+            type: "spline",
+            showInLegend: true,
+            dataPoints: dataPointsPitch
+        }]
+    });
+
+    function toggleDataSeries(e) {
+        if (typeof (e.dataSeries.visible) === "undefined" || e.dataSeries.visible) {
+            e.dataSeries.visible = false;
+        } else {
+            e.dataSeries.visible = true;
+        }
+        e.chart.render();
+    }
+
+    function updateCharts(data) {
+        const time = new Date(data.timestamp);
+
+        // Add new data points
+        dataPointsAccelX.push({ x: time, y: data.x });
+        dataPointsAccelY.push({ x: time, y: data.y });
+        dataPointsAccelZ.push({ x: time, y: data.z });
+        dataPointsRoll.push({ x: time, y: data.roll });
+        dataPointsPitch.push({ x: time, y: data.pitch });
+
+        // Remove old data points
+        if (dataPointsAccelX.length > maxDataPoints) {
+            dataPointsAccelX.shift();
+            dataPointsAccelY.shift();
+            dataPointsAccelZ.shift();
+            dataPointsRoll.shift();
+            dataPointsPitch.shift();
+        }
+
+        accelChart.render();
+        orientationChart.render();
+    }
+
+    // --- Socket.IO Connection ---
+    // The io() function will connect to the server that served this page.
+    const socket = io();
+
+    socket.on('connect', () => {
+        console.log("Socket.IO connection established with ID:", socket.id);
+    });
+
+    // Listen for the 'accelerometer-data' event from the server
+    socket.on('accelerometer-data', (data) => {
+        // Socket.IO automatically parses the JSON, so we get an object directly
+        console.log("Data received:", data);
+        updateCharts(data);
+    });
+
+    socket.on('disconnect', () => {
+        console.log("Socket.IO connection closed");
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error("Socket.IO Connection Error:", error);
+    });
+}
+</script>
+</body>
+</html>
